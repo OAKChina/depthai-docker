@@ -137,8 +137,7 @@ done
 
 # Set the docker image
 DEFAULT_TAG="latest"
-#FINAL_IMAGE=richardarducam/depthai:${ARG_IMAGE:-${DEFAULT_TAG}}
-FINAL_IMAGE=depthai:test1
+FINAL_IMAGE=richardarducam/depthai:${ARG_IMAGE:-${DEFAULT_TAG}}
 
 # Handle special update command
 if [ "$special_update_command" != "" ]; then
