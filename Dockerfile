@@ -10,6 +10,7 @@ RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && apt-get install -y locales python3-pyqt5 python3-pyqt5.qtquick python3-pipdeptree git \
     udev qml-module-qtquick-controls qml-module-qt-labs-platform qml-module-qtquick-controls2 \
     python3-venv python3-numpy libilmbase-dev libopenexr-dev libgstreamer1.0-dev libturbojpeg0 \
+    python3-tk \
     && mkdir -p /etc/udev/rules.d/ \
     && echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' | tee /etc/udev/rules.d/80-movidius.rules > /dev/null \
     && sed -ie 's/# zh_CN.UTF-8 UTF-8/zh_CN.UTF-8 UTF-8/g' /etc/locale.gen \
