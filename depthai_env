@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+
+#------------------------------------------------------------------------------
+# Helpers
+#
+err() {
+    echo -e >&2 "ERROR: $*\n"
+}
+
+die() {
+    err "$*"
+    exit 1
+}
+
+has() {
+    # eg. has command update
+    local kind=$1
+    local name=$2
+
+    type -t $kind:$name | grep -q function
+}
+
+# If OCI_EXE is not already set, search for a container executor (OCI stands for "Open Container Initiative")
+if [ -z "$OCI_EXE" ]; then
+    if which docker >/dev/null 2>/dev/null; then
+        OCI_EXE=docker
+    elif which podman >/dev/null 2>/dev/null; then
+        OCI_EXE=podman
+    else
+        die "Cannot find a container executor. Search for docker and podman."
+    fi
+fi
+
+#------------------------------------------------------------------------------
+# Command handlers
+#
+command:update-image() {
+    $OCI_EXE pull $FINAL_IMAGE
+}
+
+help:update-image() {
+    echo "Pull the latest $FINAL_IMAGE ."
+}
+
+command:update-script() {
+    if cmp -s <( $OCI_EXE run --rm $FINAL_IMAGE ) $0; then
+        echo "$0 is up to date"
+    else
+        echo -n "Updating $0 ... "
+        $OCI_EXE run --rm $FINAL_IMAGE > $0 && echo ok
+    fi
+}
+
+help:update-script() {
+    echo "Update $0 from $FINAL_IMAGE ."
+}
+
+command:update() {
+    command:update-image
+    command:update-script
+}
+
+help:update() {
+    echo "Pull the latest $FINAL_IMAGE, and then update $0 from that."
+}
+
+command:help() {
+    if [[ $# != 0 ]]; then
+        if ! has command $1; then
+            err \"$1\" is not an dockcross command
+            command:help
+        elif ! has help $1; then
+            err No help found for \"$1\"
+        else
+            help:$1
+        fi
+    else
+        cat >&2 <<ENDHELP
+Usage: depthai_env [options] [--] command [args]
+
+By default, run the given *command* in an dockcross Docker container.
+
+The *options* can be one of:
+
+    --image|-i          Docker cross-compiler image to use
+
+Additionally, there are special update commands:
+
+    update-image
+    update-script
+    update
+
+For update command help use: $0 help <command>
+ENDHELP
+        exit 1
+    fi
+}
+
+#------------------------------------------------------------------------------
+# Option processing
+#
+special_update_command=''
+while [[ $# != 0 ]]; do
+    case $1 in
+
+        --)
+            shift
+            break
+            ;;
+        --image|-i)
+            ARG_IMAGE="$2"
+            shift 2
+            ;;
+        update|update-image|update-script)
+            special_update_command=$1
+            break
+            ;;
+        -*)
+            err Unknown option \"$1\"
+            command:help
+            exit
+            ;;
+
+        *)
+            break
+            ;;
+
+    esac
+done
+
+# The precedence for options is:
+# 1. command-line arguments
+# 2. environment variables
+# 3. defaults
+
+# Source the config file if it exists
+
+# Set the docker image
+DEFAULT_TAG="latest"
+#FINAL_IMAGE=richardarducam/depthai:${ARG_IMAGE:-${DEFAULT_TAG}}
+FINAL_IMAGE=depthai:test1
+
+# Handle special update command
+if [ "$special_update_command" != "" ]; then
+    case $special_update_command in
+
+        update)
+            command:update
+            exit $?
+            ;;
+
+        update-image)
+            command:update-image
+            exit $?
+            ;;
+
+        update-script)
+            command:update-script
+            exit $?
+            ;;
+
+    esac
+fi
+
+HOST_PWD=$PWD
+[ -L $HOST_PWD ] && HOST_PWD=$(readlink $HOST_PWD)
+
+#------------------------------------------------------------------------------
+# Now, finally, run the command in a container
+#
+echo $OCI_EXE
+TTY_ARGS=
+tty -s && TTY_ARGS=-ti
+CONTAINER_NAME=depthai_$RANDOM
+xhost + && \
+$OCI_EXE run $TTY_ARGS --name $CONTAINER_NAME \
+    --platform linux/amd64 \
+    --privileged \
+    --network=host \
+    -v /dev/bus/usb:/dev/bus/usb \
+    --device-cgroup-rule='c 189:* rmw' \
+    -e DISPLAY=unix$DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v "$HOST_PWD":/workdir \
+    -e XDG_RUNTIME_DIR=/usr/lib \
+    $FINAL_IMAGE "$@"
+run_exit_code=$?
+
+# Attempt to delete container
+rm_output=$($OCI_EXE rm -f $CONTAINER_NAME 2>&1)
+rm_exit_code=$?
+if [[ $rm_exit_code != 0 ]]; then
+  if [[ "$CIRCLECI" == "true" ]] && [[ $rm_output == *"Driver btrfs failed to remove"* ]]; then
+    : # Ignore error because of https://circleci.com/docs/docker-btrfs-error/
+  else
+    echo "$rm_output"
+    exit $rm_exit_code
+  fi
+fi
+
+exit $run_exit_code
+
+################################################################################
+#
+# This image is not intended to be run manually.
+#
+# To create a helper script for the image, run:
+#
+# docker run --rm richardarducam/depthai:latest > depthai_env
+# chmod +x depthai_env
+#
+# You may then wish to move the script to your PATH.
+#
+################################################################################
