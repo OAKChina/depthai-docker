@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+DEFAULT_TAG="latest"
+IMAGE="richardarducam/depthai"
+# Set the docker image
+FINAL_IMAGE=${IMAGE}:${ARG_IMAGE:-${DEFAULT_TAG}}
 #------------------------------------------------------------------------------
 # Helpers
 #
@@ -13,11 +17,11 @@ die() {
 }
 
 has() {
-    # eg. has command update
+    # e.g. has command update
     local kind=$1
     local name=$2
 
-    type -t $kind:$name | grep -q function
+    type -t "$kind:$name" | grep -q function
 }
 
 # If OCI_EXE is not already set, search for a container executor (OCI stands for "Open Container Initiative")
@@ -35,24 +39,16 @@ fi
 # Command handlers
 #
 command:update-image() {
-    $OCI_EXE pull $FINAL_IMAGE
-}
-
-help:update-image() {
-    echo "Pull the latest $FINAL_IMAGE ."
+    $OCI_EXE pull "$FINAL_IMAGE"
 }
 
 command:update-script() {
-    if cmp -s <( $OCI_EXE run --rm $FINAL_IMAGE ) $0; then
-        echo "$0 is up to date"
+    if cmp -s <( $OCI_EXE run --rm "$FINAL_IMAGE" ) "$0"; then
+        echo "$0 is up-to-date"
     else
         echo -n "Updating $0 ... "
-        $OCI_EXE run --rm $FINAL_IMAGE > $0 && echo ok
+        $OCI_EXE run --rm "$FINAL_IMAGE" > "$0" && echo ok
     fi
-}
-
-help:update-script() {
-    echo "Update $0 from $FINAL_IMAGE ."
 }
 
 command:update() {
@@ -60,40 +56,25 @@ command:update() {
     command:update-script
 }
 
-help:update() {
-    echo "Pull the latest $FINAL_IMAGE, and then update $0 from that."
-}
-
 command:help() {
-    if [[ $# != 0 ]]; then
-        if ! has command $1; then
-            err \"$1\" is not an dockcross command
-            command:help
-        elif ! has help $1; then
-            err No help found for \"$1\"
-        else
-            help:$1
-        fi
-    else
-        cat >&2 <<ENDHELP
-Usage: depthai_env [options] [--] command [args]
+  cat >&2 <<ENDHELP
+Usage: depthai_env [options] [--] command
 
-By default, run the given *command* in an dockcross Docker container.
+By default, run the given *command* in Docker container.
 
 The *options* can be one of:
 
-    --image|-i          Docker cross-compiler image to use
+    --save|-s         Docker image tag to save
+    --image|-i        Docker image tag to use
+    --help|-h         Show this message
 
 Additionally, there are special update commands:
 
-    update-image
-    update-script
-    update
+    update-image      Pull the latest $FINAL_IMAGE.
+    update-script     Update $0 from $FINAL_IMAGE.
+    update            Pull the latest $FINAL_IMAGE, and then update $0 from that.
 
-For update command help use: $0 help <command>
 ENDHELP
-        exit 1
-    fi
 }
 
 #------------------------------------------------------------------------------
@@ -107,20 +88,32 @@ while [[ $# != 0 ]]; do
             shift
             break
             ;;
+        --save|-s)
+            read -p " What tag should be saved (default: latest): " IMAGE_NAME
+            IMAGE_NAME="${IMAGE_NAME:-latest}"
+            echo "IMAGE NAME TO SAVE: ${IMAGE}:${IMAGE_NAME}"
+            shift
+            ;;
         --image|-i)
+            # read -p " What tag should be used (default: latest): " ARG_IMAGE
+            # ARG_IMAGE="${ARG_IMAGE:-latest}"
             ARG_IMAGE="$2"
-            shift 2
+            echo "IMAGE NAME TO USE: ${IMAGE}:${ARG_IMAGE}"
+            shift
             ;;
         update|update-image|update-script)
             special_update_command=$1
             break
+            ;;
+        --help|-h)
+            command:help
+            exit
             ;;
         -*)
             err Unknown option \"$1\"
             command:help
             exit
             ;;
-
         *)
             break
             ;;
@@ -134,10 +127,6 @@ done
 # 3. defaults
 
 # Source the config file if it exists
-
-# Set the docker image
-DEFAULT_TAG="latest"
-FINAL_IMAGE=richardarducam/depthai:${ARG_IMAGE:-${DEFAULT_TAG}}
 
 # Handle special update command
 if [ "$special_update_command" != "" ]; then
@@ -162,16 +151,15 @@ if [ "$special_update_command" != "" ]; then
 fi
 
 HOST_PWD=$PWD
-[ -L $HOST_PWD ] && HOST_PWD=$(readlink $HOST_PWD)
+[ -L "$HOST_PWD" ] && HOST_PWD=$(readlink "$HOST_PWD")
 
 #------------------------------------------------------------------------------
 # Now, finally, run the command in a container
 #
-echo $OCI_EXE
-TTY_ARGS=
-tty -s && TTY_ARGS=-ti
+echo "OCI_EXE: $OCI_EXE"
+TTY_ARGS=-ti
 CONTAINER_NAME=depthai_$RANDOM
-xhost + && \
+xhost local:root && \
 $OCI_EXE run $TTY_ARGS --name $CONTAINER_NAME \
     --platform linux/amd64 \
     --privileged \
@@ -182,8 +170,13 @@ $OCI_EXE run $TTY_ARGS --name $CONTAINER_NAME \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v "$HOST_PWD":/workdir \
     -e XDG_RUNTIME_DIR=/usr/lib \
-    $FINAL_IMAGE "$@"
+    "$FINAL_IMAGE" "$@"
 run_exit_code=$?
+
+if [ -z "${IMAGE_NAME}" ]; then
+  $OCI_EXE tag "$FINAL_IMAGE" "$FINAL_IMAGE"_"$(date +%Y%m%d%H%M)"
+  $OCI_EXE commit $CONTAINER_NAME ${IMAGE}:"${IMAGE_NAME}"
+fi
 
 # Attempt to delete container
 rm_output=$($OCI_EXE rm -f $CONTAINER_NAME 2>&1)

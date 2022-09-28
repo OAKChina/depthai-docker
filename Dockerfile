@@ -20,6 +20,6 @@ RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && python3 -m pip install -U pip \
     && python3 -m pip install -r /tmp/requirements.txt --no-cache-dir --prefer-binary
 
-COPY depthai_env /tmp
+COPY entrypoint.sh /tmp
 WORKDIR /workdir
 CMD cat /tmp/depthai_env
