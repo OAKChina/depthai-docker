@@ -1,4 +1,15 @@
 ## Introduction
+
+<details>
+  <summary>
+    Install Docker
+  </summary>
+
+```shell
+curl -fsSL https://get.docker.com | sh --mirror Aliyun
+```
+</details>
+
 > This image is not intended to be run manually.
 > 
 > To create a helper script for the image, run:
@@ -46,6 +57,9 @@ Additionally, there are special update commands:
 > ...
 > ```
 > 
+
+### Download env
+[releases](https://github.com/richard-xx/depthai-docker/releases)
 
 ### DepthAI Demo
 ```shell

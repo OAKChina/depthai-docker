@@ -1,4 +1,15 @@
 ## 介绍
+
+<details>
+  <summary>
+    docker 安装
+  </summary>
+
+```shell
+curl -fsSL https://get.docker.com | sh --mirror Aliyun
+```
+</details>
+
 > 此镜像不需要手动运行。
 > 
 > 要为镜像创建帮助脚本，请运行：
@@ -46,6 +57,9 @@ Usage: depthai_env [options] [--] command
 > ...
 > ```
 > 
+
+### 下载
+[releases](https://github.com/richard-xx/depthai-docker/releases)
 
 ### DepthAI Demo
 ```shell
