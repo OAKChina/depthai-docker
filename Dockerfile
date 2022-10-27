@@ -6,7 +6,7 @@ COPY NotoSansCJK-Regular.ttc /usr/share/fonts/NotoSansCJK-Regular.ttc
 RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && apt-get update -qq \
     && apt upgrade -y \
-    && apt-get install -y locales python3-pyqt5 python3-pyqt5.qtquick git \
+    && apt-get install -y locales python3-pyqt5 python3-pyqt5.qtquick git python3-pip \
     udev qml-module-qtquick-controls qml-module-qt-labs-platform qml-module-qtquick-controls2 \
     python3-venv python3-numpy libilmbase-dev libopenexr-dev libgstreamer1.0-dev libturbojpeg0 \
     python3-tk \
